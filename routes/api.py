@@ -1,25 +1,65 @@
-"""Базовий REST API застосунку LOQ Market у форматі JSON."""
-import math
-import re
-import sqlite3
-
-from flask import Blueprint, current_app, jsonify, request, url_for
+"""REST API v1 застосунку LOQ Market (та сумісний неверсіонований префікс /api)."""
+from flask import Blueprint, request, url_for, jsonify
 
 import models
+from .api_common import (
+    error_response,
+    parse_json_object,
+    register_db_error_handler,
+    validate_feedback_payload,
+    validate_order_payload,
+    validate_product_payload,
+)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+api_v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+register_db_error_handler(api_bp, v2=False)
+register_db_error_handler(api_v1_bp, v2=False)
+
+
+@api_bp.after_request
+@api_v1_bp.after_request
+def add_v1_version_header(response):
+    """Додає заголовок версії API для клієнтів."""
+    response.headers.setdefault("X-API-Version", "1.0")
+    return response
+
+
+def _v1_route(rule, **options):
+    """Реєструє маршрут одночасно на /api/... та /api/v1/... без дублювання коду."""
+
+    def decorator(func):
+        api_bp.add_url_rule(rule, view_func=func, **options)
+        api_v1_bp.add_url_rule(rule, view_func=func, **options)
+        return func
+
+    return decorator
+
+
+def _first_error(errors):
+    return next(iter(errors.values()))
+
 
 SWAGGER_CONFIG = {
     "headers": [],
     "specs": [
         {
-            "endpoint": "apispec_1",
-            "route": "/apispec_1.json",
-            "rule_filter": lambda rule: rule.rule.startswith("/api/"),
+            "endpoint": "apispec_v2",
+            "name": "LOQ Market API v2 (Повне API)",
+            "version": "2.0.0",
+            "route": "/apispec_v2.json",
+            "rule_filter": lambda rule: rule.rule.startswith("/api/v2/"),
             "model_filter": lambda tag: True,
-        }
+        },
+        {
+            "endpoint": "apispec_v1",
+            "name": "LOQ Market API v1 (Базове API)",
+            "version": "1.0.0",
+            "route": "/apispec_v1.json",
+            "rule_filter": lambda rule: rule.rule.startswith("/api/v1/"),
+            "model_filter": lambda tag: True,
+        },
     ],
     "static_url_path": "/flasgger_static",
     "swagger_ui": True,
@@ -30,31 +70,34 @@ SWAGGER_TEMPLATE = {
     "swagger": "2.0",
     "info": {
         "title": "LOQ Market REST API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "description": (
             "Документація REST API магазину скінів Counter-Strike 2 (LOQ Market).\n\n"
-            "### Загальні правила\n"
-            "- Усі запити з тілом мають використовувати `Content-Type: application/json`.\n"
-            "- Усі відповіді та помилки повертаються у форматі JSON (`{\"error\": \"...\"}`).\n\n"
+            "### Версії API\n"
+            "- **v1 (`/api/v1/...`, а також `/api/...`)** — базовий REST API (товари, категорії, замовлення, відгуки).\n"
+            "- **v2 (`/api/v2/...`)** — повне API для всіх сутностей (товари, категорії, замовлення, промокоди, "
+            "користувачі, відгуки) із фільтрацією, сортуванням, пагінацією, `PATCH` для товарів і користувачів та "
+            "деталізованими помилками валідації (`422`, `409`, `415`).\n\n"
+            "Перемикайте версію специфікації у випадаючому списку **Select a definition** у верхній панелі.\n\n"
             "### Приклади використання (curl)\n"
             "```bash\n"
-            "# Отримати всі товари\n"
-            "curl http://127.0.0.1:5000/api/products\n\n"
-            "# Додати товар\n"
-            "curl -X POST http://127.0.0.1:5000/api/products \\\n"
+            "# API v1: отримати всі товари\n"
+            "curl http://127.0.0.1:5000/api/v1/products\n\n"
+            "# API v2: пошук і пагінація товарів\n"
+            "curl 'http://127.0.0.1:5000/api/v2/products?q=AWP&sort=price_desc&page=1&per_page=5'\n\n"
+            "# API v2: часткове оновлення ціни товару\n"
+            "curl -X PATCH http://127.0.0.1:5000/api/v2/products/1 \\\n"
             "  -H 'Content-Type: application/json' \\\n"
-            "  -d '{\"weapon\":\"AK-47\",\"skin\":\"Redline\",\"quality\":\"Field-Tested\",\"price\":25.5,\"stock\":4}'\n\n"
-            "# Оформити замовлення зі знижкою за промокодом\n"
-            "curl -X POST http://127.0.0.1:5000/api/orders \\\n"
-            "  -H 'Content-Type: application/json' \\\n"
-            "  -d '{\"product_id\":1,\"quantity\":1,\"customer_name\":\"Іван\",\"customer_email\":\"ivan@example.com\",\"promo_code\":\"LOQ10\"}'\n"
+            "  -d '{\"price\": 1199.0}'\n"
             "```"
         ),
     },
     "tags": [
         {"name": "Products", "description": "Керування товарами каталогу (скіни)"},
-        {"name": "Categories", "description": "Перегляд категорій товарів"},
+        {"name": "Categories", "description": "Керування ієрархічними категоріями товарів"},
         {"name": "Orders", "description": "Створення, перегляд і керування замовленнями"},
+        {"name": "Promocodes", "description": "Керування промокодами знижок (v2)"},
+        {"name": "Users", "description": "Керування користувачами (v2)"},
         {"name": "Feedback", "description": "Перегляд та надсилання відгуків"},
     ],
     "definitions": {
@@ -94,6 +137,19 @@ SWAGGER_TEMPLATE = {
                 "category_id": 5,
             },
         },
+        "ProductPatchInput": {
+            "type": "object",
+            "properties": {
+                "weapon": {"type": "string", "example": "AK-47"},
+                "skin": {"type": "string", "example": "Redline"},
+                "quality": {"type": "string", "example": "Minimal Wear"},
+                "price": {"type": "number", "minimum": 0, "example": 29.99},
+                "image_url": {"type": "string", "example": "https://cdn.example.com/ak47-redline.png"},
+                "stock": {"type": "integer", "minimum": 0, "example": 8},
+                "category_id": {"type": "integer", "x-nullable": True, "example": 5},
+            },
+            "example": {"price": 29.99, "stock": 8},
+        },
         "Category": {
             "type": "object",
             "properties": {
@@ -103,6 +159,15 @@ SWAGGER_TEMPLATE = {
                 "depth": {"type": "integer", "example": 2},
                 "path": {"type": "string", "example": "Скіни CS2 / Зброя / Гвинтівки"},
             },
+        },
+        "CategoryInput": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+                "name": {"type": "string", "example": "Снайперські гвинтівки"},
+                "parent_id": {"type": "integer", "x-nullable": True, "example": 2},
+            },
+            "example": {"name": "Снайперські гвинтівки", "parent_id": 2},
         },
         "OrderItem": {
             "type": "object",
@@ -185,6 +250,73 @@ SWAGGER_TEMPLATE = {
             },
             "example": {"status": "processing"},
         },
+        "Promocode": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "example": 1},
+                "code": {"type": "string", "example": "LOQ10"},
+                "discount_percent": {"type": "integer", "example": 10},
+                "active": {"type": "integer", "example": 1},
+                "expires_on": {"type": "string", "x-nullable": True, "example": "2027-12-31"},
+                "usage_limit": {"type": "integer", "x-nullable": True, "example": 100},
+                "used_count": {"type": "integer", "example": 2},
+                "created_at": {"type": "string", "example": "2026-11-26 20:00:00"},
+            },
+        },
+        "PromocodeInput": {
+            "type": "object",
+            "required": ["code", "discount_percent"],
+            "properties": {
+                "code": {"type": "string", "example": "WINTER15"},
+                "discount_percent": {"type": "integer", "minimum": 1, "maximum": 100, "example": 15},
+                "expires_on": {"type": "string", "x-nullable": True, "example": "2027-12-31"},
+                "usage_limit": {"type": "integer", "x-nullable": True, "minimum": 1, "example": 50},
+                "active": {"type": "boolean", "default": True, "example": True},
+            },
+            "example": {
+                "code": "WINTER15",
+                "discount_percent": 15,
+                "expires_on": "2027-12-31",
+                "usage_limit": 50,
+                "active": True,
+            },
+        },
+        "User": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "example": 1},
+                "name": {"type": "string", "example": "Іван Петренко"},
+                "email": {"type": "string", "example": "ivan@example.com"},
+                "role": {"type": "string", "enum": ["customer", "admin"], "example": "customer"},
+                "created_at": {"type": "string", "example": "2026-11-26 20:00:00"},
+                "orders_count": {"type": "integer", "example": 1},
+                "total_spent": {"type": "number", "format": "float", "example": 1124.1},
+                "orders": {"type": "array", "items": {"$ref": "#/definitions/OrderSummary"}},
+            },
+        },
+        "UserCreateInput": {
+            "type": "object",
+            "required": ["name", "email", "password"],
+            "properties": {
+                "name": {"type": "string", "example": "Марія Коваленко"},
+                "email": {"type": "string", "format": "email", "example": "maria@example.com"},
+                "password": {"type": "string", "minLength": 8, "example": "StrongPass123"},
+            },
+            "example": {
+                "name": "Марія Коваленко",
+                "email": "maria@example.com",
+                "password": "StrongPass123",
+            },
+        },
+        "UserUpdateInput": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "example": "Марія Оновлена"},
+                "email": {"type": "string", "format": "email", "example": "maria.new@example.com"},
+                "role": {"type": "string", "enum": ["customer", "admin"], "example": "customer"},
+            },
+            "example": {"name": "Марія Оновлена", "role": "customer"},
+        },
         "Feedback": {
             "type": "object",
             "properties": {
@@ -218,90 +350,39 @@ SWAGGER_TEMPLATE = {
                 "message": "Швидке оформлення та зручний каталог!",
             },
         },
+        "PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "page": {"type": "integer", "example": 1},
+                "per_page": {"type": "integer", "example": 20},
+                "total": {"type": "integer", "example": 9},
+                "pages": {"type": "integer", "example": 1},
+            },
+        },
         "ErrorResponse": {
             "type": "object",
             "properties": {
                 "error": {"type": "string", "example": "Ресурс не знайдено."},
             },
         },
+        "V2ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {"type": "string", "example": "Помилка валідації вхідних даних."},
+                "code": {"type": "string", "example": "VALIDATION_ERROR"},
+                "status": {"type": "integer", "example": 422},
+                "details": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                    "example": {"price": "Поле price обов'язкове й має бути числом не менше 0."},
+                },
+            },
+        },
     },
 }
 
 
-def error_response(message, status):
-    """Повертає JSON-повідомлення про помилку разом із HTTP-кодом статусу."""
-    return jsonify({"error": message}), status
-
-
-@api_bp.errorhandler(sqlite3.Error)
-def handle_database_error(error):
-    """Обробляє помилки SQLite у межах API та повертає JSON-відповідь."""
-    current_app.logger.exception("Помилка бази даних в API", exc_info=error)
-    return error_response("Помилка роботи з базою даних.", 500)
-
-
-def _is_int(value):
-    return isinstance(value, int) and not isinstance(value, bool)
-
-
-def _is_number(value):
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-
-
-def _is_valid_email(value):
-    return isinstance(value, str) and bool(_EMAIL_RE.fullmatch(value.strip()))
-
-
-def _get_json_object():
-    if not request.is_json:
-        return None, error_response("Запит повинен мати заголовок Content-Type: application/json.", 400)
-    data = request.get_json(silent=True)
-    if data is None:
-        return None, error_response("Некоректний JSON у тілі запиту.", 400)
-    if not isinstance(data, dict):
-        return None, error_response("Тіло запиту має бути JSON-об'єктом.", 400)
-    return data, None
-
-
-def _parse_product_payload(data):
-    """Валідує та нормалізує JSON-поля товару для створення й оновлення."""
-    for field in ("weapon", "skin", "quality"):
-        value = data.get(field)
-        if not isinstance(value, str) or not value.strip():
-            return None, f"Поле {field} обов'язкове й має бути непорожнім рядком."
-
-    price = data.get("price")
-    if not _is_number(price) or price < 0:
-        return None, "Поле price обов'язкове й має бути числом не менше 0."
-
-    stock = data.get("stock", 10)
-    if not _is_int(stock) or stock < 0:
-        return None, "Поле stock має бути цілим невід'ємним числом."
-
-    image_url = data.get("image_url", "")
-    if not isinstance(image_url, str):
-        return None, "Поле image_url має бути рядком."
-
-    category_id = data.get("category_id")
-    if category_id is not None:
-        if not _is_int(category_id):
-            return None, "Поле category_id має бути цілим числом або null."
-        category_ids = {category["id"] for category in models.get_categories()}
-        if category_id not in category_ids:
-            return None, "Вказану категорію не знайдено."
-
-    return {
-        "weapon": data["weapon"].strip(),
-        "skin": data["skin"].strip(),
-        "quality": data["quality"].strip(),
-        "price": round(float(price), 2),
-        "image_url": image_url.strip(),
-        "stock": stock,
-        "category_id": category_id,
-    }, None
-
-
-@api_bp.route("/products", methods=["GET"])
+@_v1_route("/products", methods=["GET"])
 def get_products():
     """Отримати список усіх товарів каталогу
     ---
@@ -336,7 +417,7 @@ def get_products():
     return jsonify(products), 200
 
 
-@api_bp.route("/products/<int:product_id>", methods=["GET"])
+@_v1_route("/products/<int:product_id>", methods=["GET"])
 def get_product(product_id):
     """Отримати один товар за ідентифікатором
     ---
@@ -381,7 +462,7 @@ def get_product(product_id):
     return jsonify(dict(product)), 200
 
 
-@api_bp.route("/products", methods=["POST"])
+@_v1_route("/products", methods=["POST"])
 def create_product():
     """Створити новий товар у каталозі
     ---
@@ -404,7 +485,7 @@ def create_product():
         headers:
           Location:
             type: string
-            description: Адреса створеного товару (/api/products/{id})
+            description: Адреса створеного товару (/api/v1/products/{id})
         schema:
           $ref: '#/definitions/Product'
         examples:
@@ -426,13 +507,13 @@ def create_product():
           application/json:
             error: "Поле price обов'язкове й має бути числом не менше 0."
     """
-    data, err = _get_json_object()
+    data, err = parse_json_object(v2=False)
     if err is not None:
         return err
 
-    parsed, message = _parse_product_payload(data)
-    if message:
-        return error_response(message, 400)
+    parsed, errors = validate_product_payload(data)
+    if errors:
+        return error_response(_first_error(errors), 400)
 
     product_id = models.save_product(
         None,
@@ -445,10 +526,10 @@ def create_product():
         parsed["category_id"],
     )
     created = dict(models.get_product(product_id))
-    return jsonify(created), 201, {"Location": url_for("api.get_product", product_id=product_id)}
+    return jsonify(created), 201, {"Location": url_for(f"{request.blueprint}.get_product", product_id=product_id)}
 
 
-@api_bp.route("/products/<int:product_id>", methods=["PUT"])
+@_v1_route("/products/<int:product_id>", methods=["PUT"])
 def update_product(product_id):
     """Повністю оновити існуючий товар
     ---
@@ -491,13 +572,13 @@ def update_product(product_id):
     if models.get_product(product_id) is None:
         return error_response("Товар не знайдено.", 404)
 
-    data, err = _get_json_object()
+    data, err = parse_json_object(v2=False)
     if err is not None:
         return err
 
-    parsed, message = _parse_product_payload(data)
-    if message:
-        return error_response(message, 400)
+    parsed, errors = validate_product_payload(data)
+    if errors:
+        return error_response(_first_error(errors), 400)
 
     models.save_product(
         product_id,
@@ -513,7 +594,7 @@ def update_product(product_id):
     return jsonify(updated), 200
 
 
-@api_bp.route("/products/<int:product_id>", methods=["DELETE"])
+@_v1_route("/products/<int:product_id>", methods=["DELETE"])
 def delete_product(product_id):
     """Видалити товар за ідентифікатором
     ---
@@ -554,7 +635,7 @@ def delete_product(product_id):
     return "", 204
 
 
-@api_bp.route("/categories", methods=["GET"])
+@_v1_route("/categories", methods=["GET"])
 def get_categories():
     """Отримати список категорій товарів
     ---
@@ -585,7 +666,7 @@ def get_categories():
     return jsonify(models.get_categories()), 200
 
 
-@api_bp.route("/orders", methods=["GET"])
+@_v1_route("/orders", methods=["GET"])
 def get_orders():
     """Отримати список усіх замовлень
     ---
@@ -617,7 +698,7 @@ def get_orders():
     return jsonify(orders), 200
 
 
-@api_bp.route("/orders/<int:order_id>", methods=["GET"])
+@_v1_route("/orders/<int:order_id>", methods=["GET"])
 def get_order(order_id):
     """Отримати замовлення за ідентифікатором
     ---
@@ -651,7 +732,7 @@ def get_order(order_id):
     return jsonify(order), 200
 
 
-@api_bp.route("/orders", methods=["POST"])
+@_v1_route("/orders", methods=["POST"])
 def create_order():
     """Створити нове замовлення
     ---
@@ -674,7 +755,7 @@ def create_order():
         headers:
           Location:
             type: string
-            description: Адреса створеного замовлення (/api/orders/{id})
+            description: Адреса створеного замовлення (/api/v1/orders/{id})
         schema:
           $ref: '#/definitions/OrderDetail'
       400:
@@ -692,46 +773,27 @@ def create_order():
           application/json:
             error: "Товар не знайдено."
     """
-    data, err = _get_json_object()
+    data, err = parse_json_object(v2=False)
     if err is not None:
         return err
 
-    product_id = data.get("product_id")
-    quantity = data.get("quantity")
-    customer_name = data.get("customer_name")
-    customer_email = data.get("customer_email")
-    promo_code = data.get("promo_code", "")
+    parsed, errors = validate_order_payload(data)
+    if errors:
+        return error_response(_first_error(errors), 400)
 
-    if not _is_int(product_id) or product_id < 1:
-        return error_response("Поле product_id обов'язкове й має бути додатним цілим числом.", 400)
-    if not _is_int(quantity) or quantity < 1:
-        return error_response("Поле quantity обов'язкове й має бути додатним цілим числом.", 400)
-    if not isinstance(customer_name, str) or not customer_name.strip():
-        return error_response("Поле customer_name обов'язкове й має бути непорожнім рядком.", 400)
-    if not _is_valid_email(customer_email):
-        return error_response("Поле customer_email обов'язкове й має містити коректний email.", 400)
-    if not isinstance(promo_code, str):
-        return error_response("Поле promo_code має бути рядком.", 400)
-
-    if models.get_product(product_id) is None:
+    if models.get_product(parsed["product_id"]) is None:
         return error_response("Товар не знайдено.", 404)
 
     try:
-        order_id = models.create_order(
-            product_id=product_id,
-            customer_name=customer_name,
-            customer_email=customer_email,
-            quantity=quantity,
-            promo_code=promo_code,
-        )
+        order_id = models.create_order(**parsed)
     except ValueError as error:
         return error_response(str(error), 400)
 
     created = models.get_order(order_id)
-    return jsonify(created), 201, {"Location": url_for("api.get_order", order_id=order_id)}
+    return jsonify(created), 201, {"Location": url_for(f"{request.blueprint}.get_order", order_id=order_id)}
 
 
-@api_bp.route("/orders/<int:order_id>", methods=["PATCH"])
+@_v1_route("/orders/<int:order_id>", methods=["PATCH"])
 def update_order_status(order_id):
     """Оновити статус замовлення
     ---
@@ -774,7 +836,7 @@ def update_order_status(order_id):
     if models.get_order(order_id) is None:
         return error_response("Замовлення не знайдено.", 404)
 
-    data, err = _get_json_object()
+    data, err = parse_json_object(v2=False)
     if err is not None:
         return err
 
@@ -791,7 +853,7 @@ def update_order_status(order_id):
     return jsonify(models.get_order(order_id)), 200
 
 
-@api_bp.route("/orders/<int:order_id>", methods=["DELETE"])
+@_v1_route("/orders/<int:order_id>", methods=["DELETE"])
 def delete_order(order_id):
     """Видалити замовлення за ідентифікатором
     ---
@@ -822,7 +884,7 @@ def delete_order(order_id):
     return "", 204
 
 
-@api_bp.route("/feedback", methods=["GET"])
+@_v1_route("/feedback", methods=["GET"])
 def get_feedback():
     """Отримати список усіх відгуків
     ---
@@ -849,7 +911,7 @@ def get_feedback():
     return jsonify(entries), 200
 
 
-@api_bp.route("/feedback", methods=["POST"])
+@_v1_route("/feedback", methods=["POST"])
 def create_feedback():
     """Зберегти новий відгук користувача
     ---
@@ -885,30 +947,13 @@ def create_feedback():
           application/json:
             error: "Поле email обов'язкове й має містити коректний email."
     """
-    data, err = _get_json_object()
+    data, err = parse_json_object(v2=False)
     if err is not None:
         return err
 
-    name = data.get("name")
-    email = data.get("email")
-    message = data.get("message")
+    parsed, errors = validate_feedback_payload(data)
+    if errors:
+        return error_response(_first_error(errors), 400)
 
-    if not isinstance(name, str) or not name.strip():
-        return error_response("Поле name обов'язкове й має бути непорожнім рядком.", 400)
-    if not _is_valid_email(email):
-        return error_response("Поле email обов'язкове й має містити коректний email.", 400)
-    if not isinstance(message, str) or not message.strip():
-        return error_response("Поле message обов'язкове й має бути непорожнім рядком.", 400)
-
-    feedback_id = models.create_feedback(name, email, message)
-    return (
-        jsonify(
-            {
-                "id": feedback_id,
-                "name": name.strip(),
-                "email": email.strip(),
-                "message": message.strip(),
-            }
-        ),
-        201,
-    )
+    feedback_id = models.create_feedback(parsed["name"], parsed["email"], parsed["message"])
+    return jsonify({"id": feedback_id, **parsed}), 201

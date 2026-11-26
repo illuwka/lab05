@@ -18,6 +18,13 @@ def get_all_feedback():
     ).fetchall()
 
 
+def get_feedback(feedback_id):
+    return get_db().execute(
+        "SELECT id, name, email, message, created_at FROM feedback WHERE id = ?",
+        (feedback_id,),
+    ).fetchone()
+
+
 def delete_feedback(feedback_id):
     db = get_db()
     cursor = db.execute("DELETE FROM feedback WHERE id = ?", (feedback_id,))

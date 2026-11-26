@@ -8,8 +8,9 @@ from werkzeug.exceptions import HTTPException
 
 import models
 import seed_data
-from routes import admin_bp, api_bp, auth_bp, feedback_bp, shop_bp
+from routes import admin_bp, api_bp, api_v1_bp, api_v2_bp, auth_bp, feedback_bp, shop_bp
 from routes.api import SWAGGER_CONFIG, SWAGGER_TEMPLATE
+from routes.api_common import API_ERROR_CODES, v2_error_response
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("LOQ_MARKET_SECRET_KEY", "loq-market-development-key")
@@ -29,6 +30,8 @@ app.register_blueprint(feedback_bp)
 app.register_blueprint(shop_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(api_bp)
+app.register_blueprint(api_v1_bp)
+app.register_blueprint(api_v2_bp)
 
 swagger = Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
 
@@ -51,12 +54,18 @@ def _is_api_request():
     return request.path == "/api" or request.path.startswith("/api/")
 
 
+def _is_api_v2_request():
+    return request.path == "/api/v2" or request.path.startswith("/api/v2/")
+
+
 @app.errorhandler(HTTPException)
 def handle_http_error(error):
     """Для адрес /api/... повертає JSON-помилку, для вебсторінок — стандартну відповідь."""
     if _is_api_request():
         status = error.code or 500
         message = API_ERROR_MESSAGES.get(status, error.description or "Помилка запиту")
+        if _is_api_v2_request():
+            return v2_error_response(message, status, API_ERROR_CODES.get(status, "API_ERROR"))
         return jsonify({"error": message}), status
     return error
 
@@ -66,6 +75,8 @@ def handle_unexpected_error(error):
     """Перехоплює непередбачені помилки на /api/... і повертає JSON зі статусом 500."""
     if _is_api_request():
         app.logger.exception("Непередбачена помилка API", exc_info=error)
+        if _is_api_v2_request():
+            return v2_error_response(API_ERROR_MESSAGES[500], 500, "INTERNAL_SERVER_ERROR")
         return jsonify({"error": API_ERROR_MESSAGES[500]}), 500
     raise error
 

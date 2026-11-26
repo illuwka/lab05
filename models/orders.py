@@ -27,6 +27,17 @@ def get_promocodes():
     """).fetchall()
 
 
+def get_promocode(promo_id):
+    return get_db().execute("""
+        SELECT p.id, p.code, p.discount_percent, p.active, p.expires_on, p.usage_limit,
+               p.created_at,
+               (SELECT COUNT(*) FROM orders o
+                WHERE o.promo_code = p.code AND o.status != 'cancelled') AS used_count
+        FROM promocodes p
+        WHERE p.id = ?
+    """, (promo_id,)).fetchone()
+
+
 def get_available_promocodes():
     today = date.today().isoformat()
     return [

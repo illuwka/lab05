@@ -3,6 +3,7 @@ from .catalog import (
     delete_category,
     delete_product,
     get_categories,
+    get_category,
     get_favorite_product_ids,
     get_favorite_products,
     get_or_create_category,
@@ -13,7 +14,7 @@ from .catalog import (
     toggle_favorite,
 )
 from .db import close_db, get_db, init_app, init_db
-from .feedback import create_feedback, delete_feedback, get_all_feedback
+from .feedback import create_feedback, delete_feedback, get_all_feedback, get_feedback
 from .orders import (
     ORDER_STATUSES,
     STATUS_LABELS,
@@ -23,6 +24,7 @@ from .orders import (
     get_available_promocodes,
     get_order,
     get_orders,
+    get_promocode,
     get_promocodes,
     get_user_orders,
     save_promocode,
@@ -58,14 +60,17 @@ __all__ = [
     "get_all_feedback",
     "get_available_promocodes",
     "get_categories",
+    "get_category",
     "get_db",
     "get_favorite_product_ids",
     "get_favorite_products",
+    "get_feedback",
     "get_or_create_category",
     "get_order",
     "get_orders",
     "get_product",
     "get_products",
+    "get_promocode",
     "get_promocodes",
     "get_user",
     "get_user_orders",

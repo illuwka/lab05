@@ -32,6 +32,10 @@ def get_categories():
     return sorted(rows, key=lambda row: (row["path"].casefold(), row["id"]))
 
 
+def get_category(category_id):
+    return next((category for category in get_categories() if category["id"] == category_id), None)
+
+
 def save_category(category_id, name, parent_id=None):
     db = get_db()
     name = name.strip()
