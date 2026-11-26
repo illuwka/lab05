@@ -2,11 +2,14 @@
 import os
 from pathlib import Path
 
+from flasgger import Swagger
 from flask import Flask, abort, g, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.exceptions import HTTPException
 
 import models
 import seed_data
 from routes import admin_bp, api_bp, auth_bp, feedback_bp, shop_bp
+from routes.api import SWAGGER_CONFIG, SWAGGER_TEMPLATE
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("LOQ_MARKET_SECRET_KEY", "loq-market-development-key")
@@ -27,22 +30,44 @@ app.register_blueprint(shop_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(api_bp)
 
+swagger = Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
 
-@app.errorhandler(400)
-@app.errorhandler(404)
-@app.errorhandler(405)
-@app.errorhandler(500)
-def handle_api_error(error):
+
+API_ERROR_MESSAGES = {
+    400: "Некоректний запит",
+    401: "Потрібна автентифікація",
+    403: "Доступ заборонено",
+    404: "Ресурс не знайдено",
+    405: "Метод не дозволений для цієї адреси",
+    409: "Конфлікт даних під час виконання запиту",
+    415: "Непідтримуваний тип даних (очікується application/json)",
+    422: "Неможливо обробити передані дані",
+    500: "Внутрішня помилка сервера",
+    503: "Сервіс тимчасово недоступний",
+}
+
+
+def _is_api_request():
+    return request.path == "/api" or request.path.startswith("/api/")
+
+
+@app.errorhandler(HTTPException)
+def handle_http_error(error):
     """Для адрес /api/... повертає JSON-помилку, для вебсторінок — стандартну відповідь."""
-    if request.path == "/api" or request.path.startswith("/api/"):
-        messages = {
-            400: "Некоректний запит",
-            404: "Ресурс не знайдено",
-            405: "Метод не дозволений для цієї адреси",
-            500: "Внутрішня помилка сервера",
-        }
-        return jsonify({"error": messages.get(error.code, "Помилка запиту")}), error.code
+    if _is_api_request():
+        status = error.code or 500
+        message = API_ERROR_MESSAGES.get(status, error.description or "Помилка запиту")
+        return jsonify({"error": message}), status
     return error
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    """Перехоплює непередбачені помилки на /api/... і повертає JSON зі статусом 500."""
+    if _is_api_request():
+        app.logger.exception("Непередбачена помилка API", exc_info=error)
+        return jsonify({"error": API_ERROR_MESSAGES[500]}), 500
+    raise error
 
 
 @app.before_request
