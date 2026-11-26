@@ -137,7 +137,13 @@ def toggle_favorite(user_id, product_id):
 
 def get_product(product_id):
     return get_db().execute(
-        "SELECT id, weapon, skin, quality, price, image_url, stock FROM products WHERE id = ?",
+        """
+        SELECT p.id, p.weapon, p.skin, p.quality, p.price, p.image_url, p.stock,
+               p.category_id, c.name AS category_name
+        FROM products p
+        LEFT JOIN categories c ON c.id = p.category_id
+        WHERE p.id = ?
+        """,
         (product_id,),
     ).fetchone()
 

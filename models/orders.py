@@ -319,6 +319,29 @@ def get_orders():
     """).fetchall()
 
 
+def get_order(order_id):
+    db = get_db()
+    row = db.execute("""
+        SELECT o.id, o.user_id, o.customer_name, o.customer_email, o.total_price,
+               o.promo_code, o.discount_amount, o.status, o.created_at
+        FROM orders o
+        WHERE o.id = ?
+    """, (order_id,)).fetchone()
+    if row is None:
+        return None
+    order = dict(row)
+    items = db.execute("""
+        SELECT oi.id, oi.product_id, oi.product_name, oi.unit_price, oi.quantity,
+               p.weapon, p.skin
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = ?
+        ORDER BY oi.id
+    """, (order_id,)).fetchall()
+    order["items"] = [dict(item) for item in items]
+    return order
+
+
 def update_order_status(order_id, status):
     if status not in ORDER_STATUSES:
         raise ValueError("Недопустимий статус замовлення.")

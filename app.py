@@ -2,14 +2,16 @@
 import os
 from pathlib import Path
 
-from flask import Flask, abort, g, redirect, render_template, request, session, url_for
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, session, url_for
 
 import models
 import seed_data
-from routes import admin_bp, auth_bp, feedback_bp, shop_bp
+from routes import admin_bp, api_bp, auth_bp, feedback_bp, shop_bp
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("LOQ_MARKET_SECRET_KEY", "loq-market-development-key")
+app.json.ensure_ascii = False
+app.json.sort_keys = False
 Path(app.instance_path).mkdir(parents=True, exist_ok=True)
 app.config["DATABASE"] = os.environ.get("DATABASE", str(Path(app.instance_path) / "loq_market.sqlite3"))
 
@@ -23,6 +25,24 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(shop_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(api_bp)
+
+
+@app.errorhandler(400)
+@app.errorhandler(404)
+@app.errorhandler(405)
+@app.errorhandler(500)
+def handle_api_error(error):
+    """Для адрес /api/... повертає JSON-помилку, для вебсторінок — стандартну відповідь."""
+    if request.path == "/api" or request.path.startswith("/api/"):
+        messages = {
+            400: "Некоректний запит",
+            404: "Ресурс не знайдено",
+            405: "Метод не дозволений для цієї адреси",
+            500: "Внутрішня помилка сервера",
+        }
+        return jsonify({"error": messages.get(error.code, "Помилка запиту")}), error.code
+    return error
 
 
 @app.before_request
