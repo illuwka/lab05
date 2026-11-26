@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{baseUrl}}/api/orders"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "product_id": {{productId}},
+      "quantity": 1,
+      "customer_name": "Postman Test",
+      "customer_email": "postman-test@example.com",
+      "promo_code": ""
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test('201 Created',()=>pm.response.to.have.status(201)); pm.test('JSON з ID',()=>{pm.response.to.be.json;pm.expect(pm.response.json().id).to.exist}); pm.collectionVariables.set('orderId',String(pm.response.json().id));
+    language: text/javascript
+order: 10000

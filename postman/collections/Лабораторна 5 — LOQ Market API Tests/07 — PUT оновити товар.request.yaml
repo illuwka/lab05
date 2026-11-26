@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{baseUrl}}/api/products/{{productId}}"
+method: PUT
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "weapon": "AK-47",
+      "skin": "Postman Test Updated",
+      "quality": "Minimal Wear",
+      "price": 150,
+      "stock": 8,
+      "image_url": "",
+      "category_id": null
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('Дані оновлено',()=>pm.expect(pm.response.json().skin).to.eql('Postman Test Updated'));
+    language: text/javascript
+order: 7000

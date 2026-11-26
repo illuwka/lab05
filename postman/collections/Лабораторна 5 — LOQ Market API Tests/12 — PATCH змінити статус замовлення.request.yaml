@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/api/orders/{{orderId}}"
+method: PATCH
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "processing"
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('Статус оновлено',()=>pm.expect(pm.response.json().status).to.eql('processing'));
+    language: text/javascript
+order: 12000

@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{baseUrl}}/api/feedback"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Postman Test",
+      "email": "postman-test@example.com",
+      "message": "Тест API з Postman"
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test('201 Created',()=>pm.response.to.have.status(201)); pm.test('JSON з ID',()=>{pm.response.to.be.json;pm.expect(pm.response.json().id).to.exist});
+    language: text/javascript
+order: 13000

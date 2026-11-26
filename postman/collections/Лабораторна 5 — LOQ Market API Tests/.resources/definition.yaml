@@ -1,0 +1,6 @@
+$kind: collection
+description: Колекція звірена з C:\lab5\lab05\routes\api.py. Запускайте запити через Run collection по порядку. POST /api/feedback додає тестовий запис; запити створюють товар і замовлення та видаляють їх наприкінці.
+variables:
+  baseUrl: http://127.0.0.1:5000
+  productId: ""
+  orderId: ""

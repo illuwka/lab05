@@ -1,0 +1,21 @@
+$kind: http-request
+url: "{{baseUrl}}/api/products"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "weapon": "",
+      "skin": "",
+      "quality": "",
+      "price": -1,
+      "stock": -1
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test('400 Bad Request',()=>pm.response.to.have.status(400)); pm.test('JSON містить помилку',()=>{pm.response.to.be.json;pm.expect(pm.response.json().error).to.exist});
+    language: text/javascript
+order: 8000

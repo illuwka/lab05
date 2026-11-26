@@ -1,0 +1,465 @@
+{
+  "info": {
+    "_postman_id": "d86f18ba-60ad-4ad7-a56d-5-api-lab05-loq-market",
+    "name": "Лабораторна 5 — LOQ Market API Tests",
+    "description": "Колекція звірена з C:\\lab5\\lab05\\routes\\api.py. Запускайте запити через Run collection по порядку. POST /api/feedback додає тестовий запис; запити створюють товар і замовлення та видаляють їх наприкінці.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:5000",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — GET список товарів",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('JSON-масив',()=>{pm.response.to.be.json;pm.expect(pm.response.json()).to.be.an('array')});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — GET категорії",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/categories"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('JSON-масив категорій',()=>{pm.response.to.be.json;pm.expect(pm.response.json()).to.be.an('array')});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 — GET список замовлень",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('JSON-масив',()=>{pm.response.to.be.json;pm.expect(pm.response.json()).to.be.an('array')});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 — GET список відгуків",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/feedback"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('JSON-масив',()=>{pm.response.to.be.json;pm.expect(pm.response.json()).to.be.an('array')});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 — POST створити тестовий товар",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"weapon\": \"AK-47\",\n  \"skin\": \"Postman Test\",\n  \"quality\": \"Field-Tested\",\n  \"price\": 123.45,\n  \"stock\": 10,\n  \"image_url\": \"\",\n  \"category_id\": null\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created',()=>pm.response.to.have.status(201)); pm.test('JSON з ID',()=>{pm.response.to.be.json;pm.expect(pm.response.json().id).to.exist}); pm.collectionVariables.set('productId',String(pm.response.json().id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 — GET товар за ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('ID збігається',()=>pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get('productId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 — PUT оновити товар",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"weapon\": \"AK-47\",\n  \"skin\": \"Postman Test Updated\",\n  \"quality\": \"Minimal Wear\",\n  \"price\": 150,\n  \"stock\": 8,\n  \"image_url\": \"\",\n  \"category_id\": null\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('Дані оновлено',()=>pm.expect(pm.response.json().skin).to.eql('Postman Test Updated'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 — POST товар з помилкою валідації",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"weapon\": \"\",\n  \"skin\": \"\",\n  \"quality\": \"\",\n  \"price\": -1,\n  \"stock\": -1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 Bad Request',()=>pm.response.to.have.status(400)); pm.test('JSON містить помилку',()=>{pm.response.to.be.json;pm.expect(pm.response.json().error).to.exist});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 — GET товар з неіснуючим ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products/999999999"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404 Not Found',()=>pm.response.to.have.status(404)); pm.test('JSON містить помилку',()=>{pm.response.to.be.json;pm.expect(pm.response.json().error).to.exist});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 — POST створити тестове замовлення",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": {{productId}},\n  \"quantity\": 1,\n  \"customer_name\": \"Postman Test\",\n  \"customer_email\": \"postman-test@example.com\",\n  \"promo_code\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created',()=>pm.response.to.have.status(201)); pm.test('JSON з ID',()=>{pm.response.to.be.json;pm.expect(pm.response.json().id).to.exist}); pm.collectionVariables.set('orderId',String(pm.response.json().id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 — GET замовлення за ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('ID збігається',()=>pm.expect(String(pm.response.json().id)).to.eql(pm.collectionVariables.get('orderId')));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 — PATCH змінити статус замовлення",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"processing\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK',()=>pm.response.to.have.status(200)); pm.test('Статус оновлено',()=>pm.expect(pm.response.json().status).to.eql('processing'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 — POST створити тестовий відгук",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/feedback",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Postman Test\",\n  \"email\": \"postman-test@example.com\",\n  \"message\": \"Тест API з Postman\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created',()=>pm.response.to.have.status(201)); pm.test('JSON з ID',()=>{pm.response.to.be.json;pm.expect(pm.response.json().id).to.exist});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 — DELETE тестове замовлення",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/orders/{{orderId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204 No Content',()=>pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 — DELETE тестовий товар",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/products/{{productId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204 No Content',()=>pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

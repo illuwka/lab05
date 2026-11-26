@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{baseUrl}}/api/products"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "weapon": "AK-47",
+      "skin": "Postman Test",
+      "quality": "Field-Tested",
+      "price": 123.45,
+      "stock": 10,
+      "image_url": "",
+      "category_id": null
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test('201 Created',()=>pm.response.to.have.status(201)); pm.test('JSON з ID',()=>{pm.response.to.be.json;pm.expect(pm.response.json().id).to.exist}); pm.collectionVariables.set('productId',String(pm.response.json().id));
+    language: text/javascript
+order: 5000
