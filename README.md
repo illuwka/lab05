@@ -232,11 +232,12 @@ curl -i -X POST http://127.0.0.1:5000/api/v1/orders \
 ```
 
 ### Swagger / OpenAPI документація (`flasgger`)
-
 У [`app.py`](app.py) підключено `Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)`:
 - у верхньому меню `/apidocs/` доступне перемикання між двома специфікаціями: **LOQ Market API v2 (Повне API)** (`/apispec_v2.json`) і **LOQ Market API v1 (Базове API)** (`/apispec_v1.json`);
 - у `SWAGGER_TEMPLATE["definitions"]` описано OpenAPI-схеми для всіх ресурсів, запитів, пагінації та помилок (`Product`, `ProductInput`, `ProductPatchInput`, `Category`, `CategoryInput`, `OrderSummary`, `OrderDetail`, `OrderCreateInput`, `OrderStatusInput`, `Promocode`, `PromocodeInput`, `User`, `UserCreateInput`, `UserUpdateInput`, `Feedback`, `FeedbackInput`, `PaginationMeta`, `ErrorResponse`, `V2ErrorResponse`);
 - усі 13 ендпоінтів v1 та 30 ендпоінтів v2 мають YAML-документацію з параметрами, схемами та прикладами для тестування через **Try it out**.
+
+![Інтерактивна документація Swagger UI (/apidocs/)](lab-reports/screenshots/Screenshot-2026-11-27-at-10-28-09-Flasgger.png)
 
 ---
 
